@@ -494,6 +494,9 @@ function Testers() {
   const [name, setName] = useState("");
   const [msg, setMsg] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [sEmail, setSEmail] = useState("");
+  const [sName, setSName] = useState("");
+  const [sAdmin, setSAdmin] = useState(false);
   const load = async () => {
     try {
       const sb = await ucapsClient;
@@ -515,6 +518,26 @@ function Testers() {
       setEmail(""); setName(""); setMsg({ text: em + " can now sign in and test phones." }); await load();
     } catch (e) { setMsg({ err: true, text: /duplicate|already exists/i.test(e.message || "") ? "That email already has an account." : "Couldn't add: " + (e.message || e) }); }
     setBusy(false);
+  };
+  const addStaff = async () => {
+    const em = sEmail.trim().toLowerCase();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)) { setMsg({ err: true, text: "Enter a valid email address." }); return; }
+    setBusy(true); setMsg(null);
+    try {
+      const sb = await ucapsClient;
+      const { error } = await sb.from("ucaps_users").insert({ email: em, name: sName.trim() || null, is_admin: sAdmin, tools: null });
+      if (error) throw error;
+      setSEmail(""); setSName(""); setSAdmin(false); setMsg({ text: em + " added with full access." }); await load();
+    } catch (e) { setMsg({ err: true, text: /duplicate|already exists/i.test(e.message || "") ? "That email already has an account." : "Couldn't add: " + (e.message || e) }); }
+    setBusy(false);
+  };
+  const removeStaff = async (em) => {
+    try {
+      const sb = await ucapsClient;
+      const { error } = await sb.from("ucaps_users").delete().eq("email", em).is("tools", null);
+      if (error) throw error;
+      setMsg({ text: em + " removed." }); await load();
+    } catch (e) { setMsg({ err: true, text: "Couldn't remove: " + (e.message || e) }); }
   };
   const remove = async (em) => {
     try {
@@ -552,8 +575,19 @@ function Testers() {
       </div>
       <div style={{ ...card, marginTop: 16 }}>
         <h3 style={h3}>Full-access staff ({staff.length})</h3>
-        <p style={{ ...muted, marginTop: 0 }}>Managed in Register Tracker → Data &amp; settings → Approved users.</p>
-        {staff.map((u) => <div key={u.email} style={{ fontFamily: "'Public Sans',sans-serif", fontSize: 13.5, padding: "5px 0", color: "#2c333a" }}>{u.name || u.email}{u.is_admin ? <span style={{ color: GOLD, background: NAVY, fontSize: 10.5, fontWeight: 700, padding: "1px 6px", borderRadius: 5, marginLeft: 8 }}>ADMIN</span> : null}</div>)}
+        <p style={{ ...muted, marginTop: 0 }}>Full access opens every UCAPS tool and its data (budget, payroll, RMA and the rest), not just emergency phones. Add testers above instead if that is not needed.</p>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", margin: "12px 0" }}>
+          <input value={sEmail} onChange={(e) => setSEmail(e.target.value)} placeholder="email@uml.edu" style={{ ...input, flex: 2, minWidth: 200 }} />
+          <input value={sName} onChange={(e) => setSName(e.target.value)} placeholder="Name (optional)" style={{ ...input, flex: 1, minWidth: 140 }} />
+          <label style={{ fontFamily: "'Public Sans',sans-serif", fontSize: 13.5, color: "#2c333a", display: "flex", gap: 6, alignItems: "center" }}><input type="checkbox" checked={sAdmin} onChange={(e) => setSAdmin(e.target.checked)} /> Admin</label>
+          <button onClick={addStaff} disabled={busy || !sEmail.trim()} style={{ ...primaryBtn, opacity: busy || !sEmail.trim() ? 0.5 : 1 }}>+ Add staff</button>
+        </div>
+        {staff.map((u) => (
+          <div key={u.email} style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 0", borderTop: "1px solid #eceff1", fontFamily: "'Public Sans',sans-serif", fontSize: 13.5, color: "#2c333a" }}>
+            <div style={{ flex: 1, minWidth: 0 }}>{u.name || u.email}{u.is_admin ? <span style={{ color: GOLD, background: NAVY, fontSize: 10.5, fontWeight: 700, padding: "1px 6px", borderRadius: 5, marginLeft: 8 }}>ADMIN</span> : null}{u.name && <div style={{ fontSize: 12, color: "#9aa3ad" }}>{u.email}</div>}</div>
+            {!u.is_admin && <button onClick={() => removeStaff(u.email)} style={{ ...ghostBtn, color: "#c0392b", borderColor: "#f0c9c4", padding: "6px 12px", fontSize: 12.5 }}>Remove</button>}
+          </div>
+        ))}
       </div>
     </div>
   );
